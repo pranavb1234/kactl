@@ -1,0 +1,108 @@
+\section{Matrix multiplication and exponentiation}
+
+Use matrix exponentiation when a fixed linear transition is applied a huge number of times: linear recurrences, tilings, finite-state DP, and walks of exactly $K$ edges. For Fibonacci, the transition is $\begin{bmatrix}1&1\\1&0\end{bmatrix}$; raising it to power $n-1$ yields $F_n$. For a $k$th-order recurrence, use a $k \times k$ matrix whose first row is the recurrence coefficients and whose remaining rows shift the state.
+
+\begin{lstlisting}
+using ll = long long;
+const ll MOD = 1e9 + 7;
+using Matrix = vector<vector<ll>>;
+
+Matrix multiply(const Matrix& A, const Matrix& B) {
+    int n = A.size(), m = B[0].size(), p = B.size();
+    Matrix C(n, vector<ll>(m));
+    for (int i = 0; i < n; i++) for (int k = 0; k < p; k++) {
+        if (A[i][k] == 0) continue; // useful for sparse matrices
+        for (int j = 0; j < m; j++)
+            C[i][j] = (C[i][j] + A[i][k] * B[k][j]) % MOD;
+    }
+    return C;
+}
+Matrix power(Matrix A, long long e) {
+    int n = A.size(); Matrix R(n, vector<ll>(n));
+    for (int i = 0; i < n; i++) R[i][i] = 1;
+    while (e) {
+        if (e & 1) R = multiply(R, A);
+        A = multiply(A, A); e >>= 1;
+    }
+    return R;
+}
+\end{lstlisting}
+
+Matrix multiplication is $O(N^3)$; exponentiation is $O(N^3 \log K)$ with $O(N^2)$ memory. Think of it for huge $n$ (often $10^{18}$), few states, and a transition independent of $n$.
+
+\section{Mo's algorithm}
+
+Mo's algorithm is an offline range-query technique. Reorder queries so the current range \texttt{[L, R]} moves gradually, requiring only \texttt{add(a[i])} and \texttt{remove(a[i])}. It is ideal for static queries such as distinct values, frequency-$K$ counts, sum of squared frequencies, and Powerful Array expressions.
+
+\begin{lstlisting}
+struct Query { int l, r, idx; };
+int BLOCK;
+bool cmp(const Query& a, const Query& b) {
+    int x = a.l / BLOCK, y = b.l / BLOCK;
+    if (x != y) return x < y;
+    return (x & 1) ? a.r > b.r : a.r < b.r;
+}
+
+// After sorting queries with cmp:
+int L = 0, R = -1;
+for (auto q : queries) {
+    while (L > q.l) add(a[--L]);
+    while (R < q.r) add(a[++R]);
+    while (L < q.l) remove(a[L++]);
+    while (R > q.r) remove(a[R--]);
+    ans[q.idx] = currentAnswer;
+}
+\end{lstlisting}
+
+Typical complexity is $O((N+Q)\sqrt N \cdot C)$, where $C$ is add/remove cost; memory is $O(N+Q)$. Coordinate-compress large or negative values before using a frequency array. Avoid Mo when queries are online, prefix sums solve the task, or add/remove is expensive. Three-dimensional Mo additionally tracks time and can handle point updates by applying and rolling them back.
+
+\section{Ordered set (PBDS)}
+
+PBDS is a GNU extension for dynamic ordered collections with rank queries. \texttt{find\_by\_order(k)} returns the zero-indexed $k$th smallest; \texttt{order\_of\_key(x)} counts elements strictly smaller than \texttt{x}. Each operation is $O(\log N)$.
+
+\begin{lstlisting}
+#include <ext/pb_ds/assoc_container.hpp>
+#include <ext/pb_ds/tree_policy.hpp>
+using namespace __gnu_pbds;
+template<class T> using ordered_set = tree<T, null_type, less<T>,
+    rb_tree_tag, tree_order_statistics_node_update>;
+template<class T> using ordered_multiset = tree<pair<T,int>, null_type,
+    less<pair<T,int>>, rb_tree_tag, tree_order_statistics_node_update>;
+
+ordered_set<int> st;
+// *st.find_by_order(k): kth smallest (0-indexed)
+// st.order_of_key(x): number of values < x
+\end{lstlisting}
+
+PBDS normally rejects duplicates. For a multiset, insert \texttt{\{value, uniqueId\}}. Then \texttt{order\_of\_key(\{X, -1\})} counts values below $X$; a sufficiently large second value counts values at most $X$. Use it for dynamic kth smallest/largest, median, rank, inversion counting, and sliding-window order statistics. It is not standard C++, so do not assume it exists outside GNU contest compilers.
+
+\section{Persistent segment tree}
+
+Persistence keeps old versions after updates. Copy only the root-to-leaf update path and reuse unchanged children; each point update creates $O(\log N)$ nodes and a new root. This supports historical queries and classic kth-smallest-in-subarray queries.
+
+\begin{lstlisting}
+struct Node { int l = 0, r = 0; long long sum = 0; };
+vector<Node> seg;
+int clone(int x) { seg.push_back(seg[x]); return (int)seg.size() - 1; }
+int update(int old, int l, int r, int pos, long long val) {
+    int cur = clone(old);
+    if (l == r) return seg[cur].sum = val, cur;
+    int m = (l + r) / 2;
+    if (pos <= m) seg[cur].l = update(seg[old].l, l, m, pos, val);
+    else seg[cur].r = update(seg[old].r, m + 1, r, pos, val);
+    seg[cur].sum = seg[seg[cur].l].sum + seg[seg[cur].r].sum;
+    return cur;
+}
+\end{lstlisting}
+
+Build costs $O(N)$; point updates and range queries cost $O(\log N)$; memory is $O(N + Q\log N)$. For kth smallest in \texttt{[L,R]}, build prefix frequency roots and compare \texttt{root[R]} against \texttt{root[L-1]}. At every node, subtract left-child counts; go left if $K$ fits, otherwise subtract and go right. Coordinate-compress values and map the final rank back to its original value.
+
+\section{Recognition guide}
+\begin{itemize}
+\item Huge linear recurrence, fixed transition, or exactly $K$ steps: \textbf{matrix exponentiation}.
+\item Many static \texttt{[L,R]} queries with easy add/remove: \textbf{Mo's algorithm}.
+\item Dynamic ordered values with kth/rank/median queries: \textbf{PBDS}.
+\item Old versions, historical queries, or kth smallest in a subarray: \textbf{persistent segment tree}.
+\end{itemize}
+
+Useful practice: Fibonacci/Tribonacci and graph walks for matrices; distinct/frequency-squared queries and 3D Mo; dynamic median/rank/inversions for PBDS; and prefix-root kth/count-$\leq X$/versioned updates for persistence. Identify the query structure first, then choose the data structure.

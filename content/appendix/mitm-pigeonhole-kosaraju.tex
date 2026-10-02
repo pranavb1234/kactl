@@ -1,0 +1,87 @@
+\section{Meet in the Middle}
+
+Use Meet in the Middle (MITM) when $N$ is too large for $O(2^N)$ but $O(2^{N/2})$ is feasible---typically $N \approx 30$--$45$. Split items into two halves, enumerate both state sets, then combine them with sorting, binary search, or two pointers. For $N=40$, this reduces about $2^{40}$ states to two lists of $2^{20}$ states.
+
+\begin{lstlisting}
+using ll = long long;
+void generate(const vector<ll>& a, int i, ll sum, vector<ll>& out) {
+    if (i == (int)a.size()) { out.push_back(sum); return; }
+    generate(a, i + 1, sum, out);
+    generate(a, i + 1, sum + a[i], out);
+}
+
+// Exact subset sum target X:
+vector<ll> L, R;
+generate(leftHalf, 0, 0, L);
+generate(rightHalf, 0, 0, R);
+sort(R.begin(), R.end());
+bool found = false;
+for (ll x : L) found |= binary_search(R.begin(), R.end(), X - x);
+\end{lstlisting}
+
+For maximum subset sum $\leq X$, use \texttt{upper\_bound(R.begin(), R.end(), X-x)}, step back once, and maximize the pair sum. Sort both lists and use two pointers when suitable. To choose exactly $K$ elements or minimize a partition difference, store the selected count with each sum. MITM also applies to xor and other independently combinable half-states. Typical time is $O(2^{N/2} \cdot N)$ and memory is $O(2^{N/2})$.
+
+\section{Pigeonhole principle}
+
+If more than $N$ objects are assigned to $N$ boxes, two objects share a box. More generally, $N$ objects in $K$ categories guarantee one category with at least $\lceil N/K \rceil$ objects. The contest skill is choosing the boxes: remainders, prefix states, colours, or states in a finite process.
+
+\subsection{Divisible subarray}
+For $n$ integers, a non-empty contiguous subarray whose sum is divisible by $n$ always exists. Track prefix-sum remainders modulo $n$: a zero remainder gives a divisible prefix, and equal remainders give a divisible difference of prefixes.
+
+\begin{lstlisting}
+vector<int> first(n, -1);
+first[0] = 0;
+int rem = 0;
+for (int i = 0; i < n; i++) {
+    rem = (rem + a[i]) % n;
+    if (rem < 0) rem += n;
+    if (first[rem] != -1) {
+        // Subarray [first[rem], i] has sum divisible by n.
+        break;
+    }
+    first[rem] = i + 1;
+}
+\end{lstlisting}
+
+Useful patterns: two values with difference divisible by $K$ (same remainder), prefix-state collisions, guaranteed duplicates, frequency lower bounds, and eventual cycles in a deterministic finite-state process. Ask: what are the objects, what are the possible states, and are there more objects than states?
+
+\section{Kosaraju's algorithm}
+
+Kosaraju finds strongly connected components (SCCs) in a directed graph. Vertices in one SCC mutually reach each other. Contracting every SCC produces the condensation graph, which is always a DAG---ideal for topological DP, longest paths, reachability, and source/sink analysis.
+
+\begin{lstlisting}
+struct Kosaraju {
+    int n; vector<vector<int>> g, rg; vector<int> vis, order, comp;
+    Kosaraju(int n) : n(n), g(n), rg(n), vis(n), comp(n, -1) {}
+    void addEdge(int u, int v) { g[u].push_back(v); rg[v].push_back(u); }
+    void dfs1(int u) {
+        vis[u] = 1;
+        for (int v : g[u]) if (!vis[v]) dfs1(v);
+        order.push_back(u);
+    }
+    void dfs2(int u, int id) {
+        comp[u] = id;
+        for (int v : rg[u]) if (comp[v] == -1) dfs2(v, id);
+    }
+    int findSCCs() {
+        for (int u = 0; u < n; u++) if (!vis[u]) dfs1(u);
+        reverse(order.begin(), order.end());
+        int id = 0;
+        for (int u : order) if (comp[u] == -1) dfs2(u, id++);
+        return id;
+    }
+};
+\end{lstlisting}
+
+The steps are: DFS on the original graph and save finishing order; reverse every edge; then DFS the transpose in decreasing finishing-time order. Each second-pass DFS is one SCC. Time and memory are $O(V+E)$. Common mistakes are forgetting the transpose, using the wrong order, and recursive stack overflow on very large graphs.
+
+If more than one SCC exists, the standard minimum edges needed to strongly connect the condensation DAG is \texttt{max(number of source SCCs, number of sink SCCs)}. Kosaraju and Tarjan have the same $O(V+E)$ complexity; Kosaraju is often easier to remember, while Tarjan needs only one DFS.
+
+\section{Recognition and practice}
+\begin{itemize}
+\item $N \approx 40$ with subset sum, partition, xor, closest sum, or choose-$K$: \textbf{MITM}.
+\item More objects than remainders/states/categories; prefix sum plus modulo; guaranteed collision or cycle: \textbf{pigeonhole}.
+\item Directed graph with mutual reachability, cycles that must become a DAG, or component compression: \textbf{Kosaraju/Tarjan}. 
+\end{itemize}
+
+Practice MITM with exact/closest/counting subset sums and two-pointer combinations; pigeonhole with modular prefix sums and repeated states; and SCCs with connectivity, source/sink components, minimum added edges, condensation-DAG DP, and weighted paths after compression.
