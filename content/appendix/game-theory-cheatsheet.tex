@@ -1,0 +1,168 @@
+\section{Game theory basics}
+
+Most contest game problems have two optimal players, perfect information, alternating turns, and no move means a loss. A position is \textbf{winning} if it has a move to a losing position; it is \textbf{losing} if every legal move reaches a winning position. This recurrence underlies Nim, Grundy numbers, and games on DAGs.
+
+\section{Nim}
+
+In normal-play Nim, one move chooses exactly one non-empty pile and removes any positive number of stones. The last player to move wins. A position is losing exactly when the xor of all pile sizes is zero; otherwise it is winning. For piles \texttt{3 4 5}, \texttt{3 \^{} 4 \^{} 5 = 2}, so the first player wins.
+
+\begin{lstlisting}
+long long xr = 0;
+for (long long x : piles) xr ^= x;
+cout << (xr ? "First\n" : "Second\n");
+\end{lstlisting}
+
+If \texttt{xr != 0}, reduce a pile \texttt{a[i]} to \texttt{a[i] \^{} xr} whenever that new value is smaller. This produces xor zero and is a winning move.
+
+\begin{lstlisting}
+for (int i = 0; i < n; i++) {
+    long long nv = a[i] ^ xr;
+    if (nv < a[i]) {
+        // Reduce a[i] to nv.
+        break;
+    }
+}
+\end{lstlisting}
+
+\subsection{Misere Nim}
+
+In misere Nim, the player making the last move loses. If every pile has size one, an odd number of piles loses and an even number wins. Otherwise use the normal-Nim xor rule.
+
+\begin{lstlisting}
+long long xr = 0; bool allOne = true;
+for (long long x : piles) xr ^= x, allOne &= (x == 1);
+bool firstWins = allOne ? (piles.size() % 2 == 0) : (xr != 0);
+\end{lstlisting}
+
+\section{Grundy numbers}
+
+For an impartial game position \texttt{v}, its Grundy number is the mex (minimum excluded non-negative integer) of the Grundy numbers of positions reachable in one move:
+\[
+g(v) = \operatorname{mex}\{g(u) \mid v \to u\}.
+\]
+For example, \texttt{mex(\{1,2,3\}) = 0}, \texttt{mex(\{0,1,3\}) = 2}, \texttt{mex(\{0,2,4\}) = 1}, and \texttt{mex(\{\}) = 0}. A position is losing iff its Grundy number is zero.
+
+\subsection{Take-away game}
+
+For a pile where a move removes 1, 2, or 3 stones, \texttt{grundy[x]} is the mex of \texttt{grundy[x-1]}, \texttt{grundy[x-2]}, and \texttt{grundy[x-3]}. The base case is \texttt{grundy[0] = 0}.
+
+\begin{lstlisting}
+vector<int> grundy(n + 1);
+for (int x = 1; x <= n; x++) {
+    set<int> reachable;
+    for (int move : {1, 2, 3})
+        if (x >= move) reachable.insert(grundy[x - move]);
+    int g = 0;
+    while (reachable.count(g)) g++;
+    grundy[x] = g;
+}
+\end{lstlisting}
+
+For a finite impartial state graph whose moves go to already-computable states, use the same pattern: collect every reachable Grundy value and take mex. A simple generic mex is:
+
+\begin{lstlisting}
+int mex(const vector<int>& values) {
+    set<int> s(values.begin(), values.end());
+    int x = 0;
+    while (s.count(x)) x++;
+    return x;
+}
+\end{lstlisting}
+
+\section{Sprague-Grundy theorem}
+
+For independent components where a move changes exactly one component, xor their Grundy numbers. The whole game is losing iff that xor is zero. Thus Nim is the special case where each pile's Grundy number equals its size.
+
+\begin{lstlisting}
+int totalGrundy = 0;
+for (int component : components)
+    totalGrundy ^= grundy[component];
+cout << (totalGrundy ? "First\n" : "Second\n");
+\end{lstlisting}
+
+To find a winning move when \texttt{totalGrundy != 0}, for component \texttt{i} compute \texttt{target = grundy[i] \^{} totalGrundy}. Search its legal moves for a next state whose Grundy number equals \texttt{target}; that move makes the total xor zero.
+
+\section{Games on DAGs}
+
+For a token that moves along directed edges of a DAG, the player unable to move loses. Compute each node by DFS or topological DP: \texttt{grundy[u] = mex(grundy[v])} over all outgoing edges \texttt{u -> v}. A start node with Grundy zero loses.
+
+\begin{lstlisting}
+vector<vector<int>> graph;
+vector<int> grundy, computed;
+
+int dfs(int u) {
+    if (computed[u]) return grundy[u];
+    computed[u] = 1;
+    vector<int> reachable;
+    for (int v : graph[u]) reachable.push_back(dfs(v));
+    return grundy[u] = mex(reachable);
+}
+\end{lstlisting}
+
+This is approximately $O(V+E)$ apart from mex costs. For many mex computations, avoid repeatedly clearing a set with a timestamp array:
+
+\begin{lstlisting}
+vector<int> seen(100000 + 5);
+int timer = 0;
+int fastMex(const vector<int>& values) {
+    ++timer;
+    for (int x : values)
+        if (x < (int)seen.size()) seen[x] = timer;
+    int result = 0;
+    while (seen[result] == timer) result++;
+    return result;
+}
+\end{lstlisting}
+
+\section{Important facts and caveats}
+
+\begin{itemize}
+\item If \texttt{g[u] == 0}, there is no move to another position with Grundy zero. If \texttt{g[u] != 0}, a move to Grundy zero exists.
+\item Sprague-Grundy theory assumes \textbf{normal play}: the last move wins. Do not blindly xor Grundy values for arbitrary misere games; misere Nim is a special case with its own formula.
+\item An \textbf{impartial} game gives both players the same moves (Nim, take-away games, and many DAG games). Grundy theory is for these games.
+\item In a \textbf{partizan} game, moves depend on the player. General partizan games require more advanced combinatorial game theory and are not directly solved by Grundy numbers.
+\end{itemize}
+
+\section{Patterns and quick reference}
+
+\begin{itemize}
+\item \textbf{Single state}: winning iff there exists a move to a losing state.
+\item \textbf{Independent games}: xor \texttt{g1 \^{} g2 \^{} ... \^{} gn}; zero loses, non-zero wins.
+\item \textbf{Nim}: choose one pile and remove any positive amount; xor pile sizes directly, no Grundy DP required.
+\item \textbf{Restricted moves}: \texttt{grundy[n] = mex(grundy[n-x1], grundy[n-x2], ...)}.
+\item \textbf{DAG}: take mex over outgoing-neighbour Grundy values.
+\end{itemize}
+
+Normal Nim, finding a Nim move, and misere Nim are each $O(n)$. Grundy DP depends on the number of transitions. Multiple independent games take $O(\text{total states} + \text{moves})$ after precomputation; DAG Grundy is $O(V+E)$ with efficient mex.
+
+\section{Contest checklist}
+
+Ask: Is it a terminating deterministic two-player game with perfect information and optimal play? Is it impartial? Is it normal or misere play? Are there independent components? Can you define a state and use winning/losing DP? Is it literally Nim? Is the state graph a DAG? If components are independent, can you xor their Grundy numbers?
+
+The useful progression is: \emph{winning/losing DP} $\rightarrow$ \emph{Nim} $\rightarrow$ \emph{Grundy numbers} $\rightarrow$ \emph{Sprague-Grundy} $\rightarrow$ \emph{xor of independent games}.
+
+\subsection{Core templates}
+\begin{lstlisting}
+// Nim
+long long xr = 0;
+for (long long x : piles) xr ^= x;
+// xr == 0: losing; otherwise winning
+
+// Grundy recurrence
+grundy[state] = mex(reachableGrundyValues);
+
+// Independent games
+int total = 0;
+for (int component : components) total ^= grundy[component];
+
+// DAG game
+int dagDfs(int u) {
+    if (computed[u]) return grundy[u];
+    computed[u] = true;
+    set<int> s;
+    for (int v : graph[u]) s.insert(dagDfs(v));
+    int g = 0;
+    while (s.count(g)) g++;
+    return grundy[u] = g;
+}
+\end{lstlisting}

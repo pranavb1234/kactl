@@ -1,0 +1,203 @@
+\section{Subtree frequency queries}
+
+DSU on Tree (also called \emph{Sack}) efficiently maintains information for every subtree. A classic task is: for every node \texttt{u}, find the maximum frequency of a colour in its subtree and the sum of all colours having that frequency. For example, \texttt{[1, 2, 2, 3, 3, 3]} has maximum frequency 3 and answer 3; \texttt{[1, 1, 2, 2, 3]} has maximum frequency 2 and answer $1+2=3$.
+
+The typical complexity is $O(n \log n)$ time and $O(n)$ space. The key is to retain data from the largest child subtree while discarding and rebuilding smaller subtrees.
+
+\subsection{Most frequent colour in every subtree}
+\begin{lstlisting}
+int n;
+vector<int> color, sz, heavy, cnt;
+vector<vector<int>> g;
+vector<long long> ans;
+int mxFreq = 0;
+long long sumOfColors = 0;
+
+void dfs_sz(int u, int p) {
+    sz[u] = 1; heavy[u] = -1;
+    int bestSize = 0;
+    for (int v : g[u]) if (v != p) {
+        dfs_sz(v, u);
+        sz[u] += sz[v];
+        if (sz[v] > bestSize) bestSize = sz[v], heavy[u] = v;
+    }
+}
+
+void addColor(int c) {
+    cnt[c]++;
+    if (cnt[c] > mxFreq) mxFreq = cnt[c], sumOfColors = c;
+    else if (cnt[c] == mxFreq) sumOfColors += c;
+}
+
+void addSubtree(int u, int p) {
+    addColor(color[u]);
+    for (int v : g[u]) if (v != p) addSubtree(v, u);
+}
+
+void clearSubtree(int u, int p) {
+    cnt[color[u]]--;
+    for (int v : g[u]) if (v != p) clearSubtree(v, u);
+}
+
+void dfs_dsu(int u, int p, bool keep) {
+    // Light children: compute their answers, then discard their data.
+    for (int v : g[u])
+        if (v != p && v != heavy[u]) dfs_dsu(v, u, false);
+
+    // Heavy child: keep its data for reuse.
+    if (heavy[u] != -1) dfs_dsu(heavy[u], u, true);
+
+    // Add all light subtrees to the heavy child's existing data.
+    for (int v : g[u])
+        if (v != p && v != heavy[u]) addSubtree(v, u);
+
+    addColor(color[u]);          // data now represents subtree(u)
+    ans[u] = sumOfColors;
+
+    if (!keep) {
+        clearSubtree(u, p);
+        mxFreq = 0;
+        sumOfColors = 0;
+    }
+}
+
+int main() {
+    ios::sync_with_stdio(false);
+    cin.tie(nullptr);
+
+    cin >> n;
+    color.resize(n + 1);
+    for (int u = 1; u <= n; u++) cin >> color[u];
+    g.resize(n + 1);
+    for (int i = 0, u, v; i < n - 1; i++) {
+        cin >> u >> v;
+        g[u].push_back(v); g[v].push_back(u);
+    }
+    sz.resize(n + 1); heavy.resize(n + 1);
+    cnt.resize(n + 1, 0); ans.resize(n + 1);
+
+    dfs_sz(1, 0);             // root at node 1
+    dfs_dsu(1, 0, true);
+    for (int u = 1; u <= n; u++) cout << ans[u] << ' ';
+    cout << '\n';
+}
+\end{lstlisting}
+
+The colour-frequency state contains \texttt{mxFreq} and \texttt{sumOfColors}. When a colour reaches a new maximum, it is the only colour with that frequency. When it reaches the current maximum, add it to the sum. During a complete clear, the counts are removed and these aggregate values reset to zero.
+
+\section{Generic DSU on Tree template}
+
+The problem-specific parts are the state, what happens when a node is added or removed, and the answer recorded at each node. The tree normally must be rooted first; \texttt{dfs\_sz} finds subtree sizes and the heavy child, then \texttt{dfs\_dsu} performs the algorithm.
+
+\begin{lstlisting}
+int n;
+vector<vector<int>> g;
+vector<int> color, sz, heavy, cnt;
+vector<long long> ans;
+
+void dfs_sz(int u, int p) {
+    sz[u] = 1; heavy[u] = -1;
+    int largest = 0;
+    for (int v : g[u]) if (v != p) {
+        dfs_sz(v, u);
+        sz[u] += sz[v];
+        if (sz[v] > largest) largest = sz[v], heavy[u] = v;
+    }
+}
+
+void add(int u, int p) {
+    // Update all problem-specific state for node u here.
+    // Example for colour frequencies:
+    cnt[color[u]]++;
+    for (int v : g[u]) if (v != p) add(v, u);
+}
+
+void remove(int u, int p) {
+    // This must exactly reverse add().
+    cnt[color[u]]--;
+    for (int v : g[u]) if (v != p) remove(v, u);
+}
+
+void clearState() {
+    // Reset extra aggregate state here, e.g. distinct, maximumFrequency, sum.
+}
+
+void dfs_dsu(int u, int p, bool keep) {
+    for (int v : g[u])
+        if (v != p && v != heavy[u]) dfs_dsu(v, u, false);
+    if (heavy[u] != -1) dfs_dsu(heavy[u], u, true);
+    for (int v : g[u])
+        if (v != p && v != heavy[u]) add(v, u);
+
+    // Add only u itself, then calculate the problem-specific answer.
+    cnt[color[u]]++;
+    ans[u] = 0; // Replace with the current statistic.
+
+    if (!keep) {
+        remove(u, p);
+        clearState();
+    }
+}
+\end{lstlisting}
+
+\section{Mental model}
+
+For a node \texttt{u} with light children and one heavy child:
+\begin{enumerate}
+\item Solve every light subtree and throw its data away.
+\item Solve the heavy subtree with \texttt{keep = true}.
+\item Add the light subtrees back to the retained heavy data.
+\item Add \texttt{u}, answer the query for \texttt{u}, and clear only if the parent does not need the data.
+\end{enumerate}
+The core line is \texttt{dfs\_dsu(heavy[u], u, true)}: keeping the largest subtree means any node is added and removed only logarithmically many times.
+
+\section{Common customizations}
+
+\subsection{Number of distinct colours}
+\begin{lstlisting}
+int distinct = 0;
+// Add:
+if (cnt[color[u]] == 0) distinct++;
+cnt[color[u]]++;
+// Remove:
+cnt[color[u]]--;
+if (cnt[color[u]] == 0) distinct--;
+// Answer:
+ans[u] = distinct;
+\end{lstlisting}
+
+\subsection{Maximum frequency}
+\begin{lstlisting}
+int mxFreq = 0;
+// Add:
+cnt[color[u]]++;
+mxFreq = max(mxFreq, cnt[color[u]]);
+// Answer:
+ans[u] = mxFreq;
+\end{lstlisting}
+If colours are removed individually, updating \texttt{mxFreq} with only \texttt{max} is insufficient. Use a frequency-of-frequencies structure, or reset it when the full state is cleared as appropriate for the implementation.
+
+\subsection{Sum of colours with maximum frequency}
+\begin{lstlisting}
+int mxFreq = 0;
+long long sum = 0;
+// Add colour c:
+cnt[c]++;
+if (cnt[c] > mxFreq) mxFreq = cnt[c], sum = c;
+else if (cnt[c] == mxFreq) sum += c;
+// Answer:
+ans[u] = sum;
+\end{lstlisting}
+For fully dynamic individual removals, a frequency-of-frequencies structure makes the maximum and sum safe to maintain.
+
+\section{When to use it}
+\begin{itemize}
+\item \textbf{DFS + brute force}: small constraints.
+\item \textbf{Small-to-large map merging}: subtree data that naturally belongs in maps or sets.
+\item \textbf{DSU on Tree}: many subtree statistics with efficient add/remove operations.
+\item \textbf{Euler Tour + Fenwick/Segment Tree}: when a subtree can be treated as a contiguous array range.
+\item \textbf{Mo's on Tree}: more complicated offline tree queries.
+\item \textbf{Heavy-Light Decomposition}: path queries and updates.
+\end{itemize}
+
+Rule of thumb: if a problem asks for a statistic over every node's subtree, and the statistic supports efficient \texttt{add(node)} and \texttt{remove(node)}, DSU on Tree is a strong candidate.
