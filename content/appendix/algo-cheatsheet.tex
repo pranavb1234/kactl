@@ -1,0 +1,159 @@
+\section{Sliding window}
+
+Maintain a window \texttt{[left, right]} over an array or string, expanding or shrinking it while preserving a condition. Typical uses include longest or shortest valid subarrays, at most $k$ distinct values, fixed-size maximum/minimum sums, and frequency-based substring problems.
+
+\subsection{Variable-size window}
+This example finds the longest subarray with sum at most $k$. It requires all values to be non-negative.
+
+\begin{lstlisting}
+int n, k;
+cin >> n >> k;
+vector<int> a(n);
+for (int &x : a) cin >> x;
+
+long long sum = 0;
+int left = 0, ans = 0;
+for (int right = 0; right < n; right++) {
+    sum += a[right];
+
+    // Shrink until the window becomes valid again.
+    while (left <= right && sum > k) {
+        sum -= a[left];
+        left++;
+    }
+
+    // [left, right] is valid.
+    ans = max(ans, right - left + 1);
+}
+cout << ans << '\n';
+\end{lstlisting}
+
+It is usually $O(n)$ time and uses $O(k)$ or $O(\text{alphabet size})$ memory, depending on the data structure used.
+
+\subsection{Fixed-size window}
+Use this for a window containing exactly $k$ elements: maximum/minimum subarray sum, maximum average, or a count/frequency calculation for every window.
+
+\begin{lstlisting}
+long long windowSum = 0;
+for (int i = 0; i < n; i++) {
+    windowSum += a[i];
+    if (i >= k) windowSum -= a[i - k];
+    if (i >= k - 1) {
+        // [i-k+1, i] is the current window. Process it here.
+    }
+}
+\end{lstlisting}
+This pattern is $O(n)$.
+
+\section{Sparse table}
+
+Preprocess a static array for fast range queries with an idempotent operation, such as range minimum, maximum, or gcd. For RMQ, query \texttt{[l, r]} with two overlapping blocks. Build time and memory are $O(n \log n)$; each query is $O(1)$. For frequently updated values, use a segment tree instead.
+
+\subsection{Range minimum query}
+\begin{lstlisting}
+class SparseTable {
+private:
+    int n, LOG;
+    vector<vector<int>> st;
+    vector<int> lg;
+
+public:
+    SparseTable(const vector<int>& a) {
+        n = a.size();
+        lg.resize(n + 1);
+        for (int i = 2; i <= n; i++) lg[i] = lg[i / 2] + 1;
+        LOG = lg[n] + 1;
+        st.assign(LOG, vector<int>(n));
+
+        // Base level: intervals of length 1.
+        for (int i = 0; i < n; i++) st[0][i] = a[i];
+
+        // st[j][i] is the minimum of a[i ... i + 2^j - 1].
+        for (int j = 1; j < LOG; j++)
+            for (int i = 0; i + (1 << j) <= n; i++)
+                st[j][i] = min(st[j - 1][i],
+                               st[j - 1][i + (1 << (j - 1))]);
+    }
+
+    // Minimum in the inclusive range [l, r].
+    int query(int l, int r) {
+        int len = r - l + 1;
+        int j = lg[len];
+        return min(st[j][l], st[j][r - (1 << j) + 1]);
+    }
+};
+
+int n, q;
+cin >> n >> q;
+vector<int> a(n);
+for (int &x : a) cin >> x;
+SparseTable sp(a);
+while (q--) {
+    int l, r;
+    cin >> l >> r;
+    // The example is 0-indexed. For 1-indexed input: --l; --r;
+    cout << sp.query(l, r) << '\n';
+}
+\end{lstlisting}
+
+For range maximum, replace \texttt{min} with \texttt{max}. For range gcd, replace it with \texttt{gcd}; the preprocessing structure is unchanged.
+
+\section{Binary exponentiation}
+
+Compute $a^b$ in $O(\log b)$ using repeated squaring, instead of multiplying $a$ by itself $b$ times. It also applies to matrix exponentiation and any associative operation that supports repeated squaring. The result can overflow if it does not fit in the selected type.
+
+\begin{lstlisting}
+long long binpow(long long a, long long b) {
+    long long ans = 1;
+    while (b > 0) {
+        if (b & 1) ans *= a;
+        a *= a;
+        b >>= 1;
+    }
+    return ans;
+}
+
+long long a, b;
+cin >> a >> b;
+cout << binpow(a, b) << '\n';
+\end{lstlisting}
+
+\section{Modular binary exponentiation}
+
+Compute $a^b \bmod m$ without forming the potentially enormous value $a^b$. It is useful in modular arithmetic, combinatorics, number theory, and modular inverse calculations with a prime modulus: $a^{m-2} \bmod m$. The \texttt{\_\_int128} multiplication prevents overflow before reducing modulo \texttt{mod}.
+
+\begin{lstlisting}
+long long binpowmod(long long a, long long b, long long mod) {
+    long long ans = 1 % mod;
+    a %= mod;
+    while (b > 0) {
+        if (b & 1) ans = (__int128)ans * a % mod;
+        a = (__int128)a * a % mod;
+        b >>= 1;
+    }
+    return ans;
+}
+
+long long a, b, mod;
+cin >> a >> b >> mod;
+cout << binpowmod(a, b, mod) << '\n';
+\end{lstlisting}
+
+For input \texttt{2 10 1000}, the result is \texttt{24}, because $2^{10} = 1024$ and $1024 \bmod 1000 = 24$.
+
+\section{Quick reference}
+\begin{itemize}
+\item \textbf{Sliding window}: contiguous subarray or substring problems; $O(n)$.
+\item \textbf{Sparse table}: static range queries; build $O(n \log n)$, query $O(1)$.
+\item \textbf{binpow}: fast $a^b$; $O(\log b)$.
+\item \textbf{binpowmod}: fast $a^b \bmod m$; $O(\log b)$.
+\end{itemize}
+
+\section{Competitive-programming tips}
+\begin{itemize}
+\item Sliding window works naturally when its condition can be adjusted monotonically. Be careful with negative values.
+\item Sparse tables are best for static arrays with many queries.
+\item Use \texttt{binpow} when the exponent is large.
+\item Prefer \texttt{binpowmod} to calculating $a^b$ first when working under a modulus.
+\item The sparse-table example uses zero-indexed inclusive ranges \texttt{[l, r]}.
+\end{itemize}

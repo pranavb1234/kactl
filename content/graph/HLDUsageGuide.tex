@@ -1,0 +1,82 @@
+\subsection{HLD setup guide (array-based template)}
+
+This guide assumes an array-based HLD implementation exposing \texttt{g}, \texttt{par}, \texttt{dep}, \texttt{in}, \texttt{sz}, \texttt{nxt}, \texttt{dfs\_sz}, \texttt{dfs\_hld}, \texttt{path\_query}, and a segment tree. It is separate from KACTL's class-based \texttt{HLD.h} below.
+
+\subsubsection{Expected input}
+\begin{lstlisting}
+n
+a[0..n-1]               // node values
+n - 1 lines: u v        // undirected, 1-indexed edges
+q, then q queries
+\end{lstlisting}
+
+\subsubsection{Rooting, build, and queries}
+Put the following flow in \texttt{main}, after the template. \texttt{adj} stores the undirected graph; \texttt{g} stores only directed parent-to-child edges.
+
+\begin{lstlisting}
+vector<int> adj[N]; // Undirected graph; separate from g[] (children only)
+
+cin >> n;
+// Read original_value[0..n-1].
+for (each edge u, v) {
+    --u; --v;
+    adj[u].push_back(v);
+    adj[v].push_back(u);
+}
+
+// Root at 0 with BFS: convert undirected adj[] into children-only g[].
+vector<int> p(n, -1);
+queue<int> q;
+q.push(0); p[0] = 0;
+while (!q.empty()) {
+    int v = q.front(); q.pop();
+    for (int u : adj[v]) if (p[u] == -1) {
+        p[u] = v;
+        g[v].push_back(u);
+        q.push(u);
+    }
+}
+
+// Build HLD.
+t = 0; par[0] = 0; dep[0] = 0;
+dfs_sz();
+nxt[0] = 0;
+dfs_hld();
+
+// Fill the segment tree using HLD positions.
+for (int v = 0; v < n; v++) val[in[v]] = original_value[v];
+SegTree seg(n);
+seg.build();
+\end{lstlisting}
+
+First convert every one-indexed query vertex to zero indexing. The usual operations are:
+\begin{lstlisting}
+path query u v  -> path_query(u, v, seg)
+update node x w -> seg.upd(in[x], w)
+subtree of v    -> seg.qry(in[v], in[v] + sz[v] - 1)
+lca(u, v)      -> lca(u, v)
+distance(u, v) -> dep[u] + dep[v] - 2 * dep[lca(u, v)]
+\end{lstlisting}
+
+\subsubsection{Edge-weight version}
+For input edges \texttt{u v w}, save \texttt{eu[i]}, \texttt{ev[i]}, and \texttt{ew[i]} while reading. After \texttt{dfs\_hld()}, store each edge at the position of its deeper endpoint:
+
+\begin{lstlisting}
+for (each edge i) {
+    int c = dep[eu[i]] > dep[ev[i]] ? eu[i] : ev[i];
+    val[in[c]] = ew[i]; // c is the child endpoint
+}
+// val[in[0]] remains the identity: the root has no parent edge.
+\end{lstlisting}
+
+For an edge path query, use the final segment \texttt{seg.qry(in[u] + 1, in[v])} and skip it when \texttt{u == v}. To update edge \texttt{i}, compute its child endpoint \texttt{c} in the same way and call \texttt{seg.upd(in[c], new\_w)}.
+
+\subsubsection{Checklist}
+\begin{itemize}
+\item The template is zero-indexed and roots at node 0. Subtract 1 from one-indexed input.
+\item For a different root \texttt{r}, start BFS at \texttt{r} and replace the root-0 initialization in \texttt{p}, \texttt{par}, \texttt{dep}, \texttt{nxt}, and the default arguments of \texttt{dfs\_sz}/\texttt{dfs\_hld}.
+\item For multiple test cases, clear \texttt{g[v]} and \texttt{adj[v]} for \texttt{v} in \texttt{[0, n)} and reset \texttt{t = 0}.
+\item \texttt{dfs\_sz} and \texttt{dfs\_hld} are recursive. Test a path graph with $n = 2 \cdot 10^5$ for stack overflow.
+\item For max, min, xor, or gcd queries, change \texttt{merge()} and the identity value.
+\item Decide whether values are on nodes or edges before setup: the two initializations differ.
+\end{itemize}
