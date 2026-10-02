@@ -1,0 +1,189 @@
+\section{Template}
+
+\begin{lstlisting}
+#include <bits/stdc++.h>
+using namespace std;
+typedef long long ll;
+typedef pair<int,int> pii;
+#define all(x) (x).begin(), (x).end()
+int main() { ios::sync_with_stdio(0); cin.tie(0); }
+\end{lstlisting}
+
+Use \texttt{'\textbackslash n'} instead of \texttt{endl}; \texttt{endl} flushes and is slow.
+
+\section{Containers}
+
+\subsection{vector: dynamic array}
+\begin{lstlisting}
+vector<int> v(n, 0);        // size n, filled with 0
+v.push_back(x); v.pop_back();
+v.size(); v.empty(); v.clear();
+v.front(); v.back(); v[i];
+v.insert(v.begin() + i, x); // O(n)
+v.erase(v.begin() + i);     // O(n)
+v.resize(k); v.assign(n, x);
+vector<vector<int>> g(n);   // adjacency list: g[u].push_back(v)
+\end{lstlisting}
+Access is $O(1)$ and \texttt{push\_back} is amortized $O(1)$.
+
+\subsection{pair and tuple}
+\begin{lstlisting}
+pair<int,int> p = {1, 2}; p.first; p.second; // lexicographic comparison
+auto [a, b] = p;                              // structured binding (C++17)
+tuple<int,int,int> t = {1, 2, 3}; get<0>(t);
+\end{lstlisting}
+
+\subsection{string}
+\begin{lstlisting}
+s.size(); s += "ab"; s.substr(pos, len);
+s.find("ab");               // string::npos if not found
+s.push_back('c'); s.pop_back();
+reverse(all(s));
+stoi(s); stoll(s); to_string(123);
+\end{lstlisting}
+
+\subsection{deque, stack, and queue}
+\begin{lstlisting}
+deque<int> d; d.push_front(x); d.push_back(x);
+d.pop_front(); d.pop_back(); d.front(); d.back(); d[i];
+
+stack<int> s; s.push(x); s.top(); s.pop(); s.empty();
+queue<int> q; q.push(x); q.front(); q.back(); q.pop(); // BFS
+\end{lstlisting}
+For a \texttt{deque}, push and pop at both ends are $O(1)$.
+
+\subsection{priority\_queue: heap}
+\begin{lstlisting}
+priority_queue<int> pq;                            // MAX heap
+priority_queue<int, vector<int>, greater<int>> pq; // MIN heap
+pq.push(x); pq.top(); pq.pop();                    // O(log n)
+
+// Dijkstra: {distance, node}
+priority_queue<pii, vector<pii>, greater<pii>> pq;
+\end{lstlisting}
+
+\subsection{set and multiset}
+\begin{lstlisting}
+set<int> s;
+s.insert(x); s.erase(x); s.count(x); s.find(x); // s.end() if absent
+s.lower_bound(x);  // first element >= x
+s.upper_bound(x);  // first element > x
+*s.begin(); *s.rbegin();                         // min / max
+
+// Largest element <= x:
+auto it = s.upper_bound(x);
+if (it != s.begin()) --it, cout << *it;
+\end{lstlisting}
+Both are sorted and take $O(\log n)$. \texttt{multiset} allows duplicates. \texttt{s.erase(x)} removes all copies; remove one with \texttt{s.erase(s.find(x))}. \texttt{unordered\_set} is $O(1)$ average, but unsorted and can be slow on bad hashes.
+
+\subsection{map, multimap, and bitset}
+\begin{lstlisting}
+map<string,int> m;
+m[key]++;                  // creates key with value 0 if absent
+m.count(key); m.find(key); m.erase(key);
+for (auto &[k, val] : m) ... // sorted key order
+m.lower_bound(k);
+
+bitset<1000> b; b[i] = 1; b.set(i); b.reset(i); b.flip(i);
+b.count(); b.any(); b.none();
+b1 & b2; b1 | b2; b1 << k; // fast bit DP and sieve
+\end{lstlisting}
+\texttt{unordered\_map} is $O(1)$ average. Do not use \texttt{m[key]} just to test existence: it inserts a missing key. Use \texttt{count} or \texttt{find}.
+
+\section{Algorithms}
+
+All functions use half-open ranges \texttt{[begin, end)}.
+\begin{lstlisting}
+sort(all(v));                               // O(n log n), ascending
+sort(all(v), greater<int>());               // descending
+sort(all(v), [](auto&a, auto&b) { return a.second < b.second; });
+reverse(all(v));                            // reverse
+unique(all(v));                             // adjacent duplicates, new end
+binary_search(all(v), x);                   // true/false, sorted input
+lower_bound(all(v), x);                     // first element >= x
+upper_bound(all(v), x);                     // first element > x
+*max_element(all(v)); *min_element(all(v)); // max / min value
+min(a, b); max(a, b); swap(a, b);           // basics
+next_permutation(all(v));                    // false after last permutation
+fill(all(v), x); iota(all(v), 0);           // fill / 0, 1, 2, ...
+accumulate(all(v), 0LL);                     // sum; 0LL avoids overflow
+count(all(v), x); find(all(v), x);          // occurrences / iterator or end()
+rotate(v.begin(), v.begin() + k, v.end());  // rotate left by k
+partial_sum(all(v), p.begin());              // prefix sums
+nth_element(v.begin(), v.begin() + k, v.end()); // kth smallest, O(n)
+is_sorted(all(v));                           // check sortedness
+\end{lstlisting}
+
+\subsection{Common idioms}
+\begin{lstlisting}
+// Coordinate compression
+sort(all(v)); v.erase(unique(all(v)), v.end());
+int id = lower_bound(all(v), x) - v.begin();
+
+// Index of lower_bound
+int pos = lower_bound(all(v), x) - v.begin();
+
+// Count elements in [l, r]
+upper_bound(all(v), r) - lower_bound(all(v), l);
+
+// All permutations
+sort(all(v)); do { /* use v */ } while (next_permutation(all(v)));
+
+// Sort indices by value
+iota(all(idx), 0);
+sort(all(idx), [&](int a, int b) { return v[a] < v[b]; });
+\end{lstlisting}
+
+\section{Numeric and utility}
+\begin{lstlisting}
+__gcd(a, b); gcd(a, b); lcm(a, b); // C++17 gcd/lcm
+abs(x); sqrt(x); pow(a, b);         // pow returns double: avoid for big ints
+__builtin_popcount(x);              // set bits; use popcountll for ll
+__builtin_clz(x); __builtin_ctz(x); // leading / trailing zeros
+INT_MAX; LLONG_MAX; INT_MIN;
+const int INF = 1e9; const ll LINF = 1e18;
+\end{lstlisting}
+
+\subsection{Fast power modulo m}
+\begin{lstlisting}
+ll power(ll a, ll b, ll m) {
+    ll r = 1; a %= m;
+    while (b) {
+        if (b & 1) r = r * a % m;
+        a = a * a % m;
+        b >>= 1;
+    }
+    return r;
+}
+\end{lstlisting}
+
+\section{Input and output}
+\begin{lstlisting}
+cin >> n; cout << x << '\n';
+getline(cin, s);                 // use cin.ignore() after cin >> n
+while (cin >> x) { ... }         // read until EOF
+cout << fixed << setprecision(6) << ans;
+\end{lstlisting}
+
+\section{Complexity quick reference}
+\begin{lstlisting}
+n <= 10             O(n!)
+n <= 20             O(2^n * n)
+n <= 500            O(n^3)
+n <= 5000           O(n^2)
+n <= 1e5 to 1e6     O(n log n)
+n <= 1e7            O(n)
+n >= 1e9            O(log n) or O(1)
+\end{lstlisting}
+Roughly $10^8$ simple operations per second.
+
+\section{Common pitfalls}
+\begin{itemize}
+\item Use \texttt{ll} above $2 \cdot 10^9$, and write \texttt{1LL * a * b}.
+\item \texttt{v.size()} is unsigned; \texttt{v.size() - 1} underflows when empty. Cast to \texttt{(int)v.size()}.
+\item On a \texttt{set}, use \texttt{s.lower\_bound(x)}. \texttt{lower\_bound(all(s), x)} is $O(n)$.
+\item \texttt{map[]} inserts missing keys. \texttt{unique} needs sorted input and a following \texttt{erase}.
+\item \texttt{memset(a, 0, sizeof a)} is safe for 0 and -1 only; use \texttt{fill} otherwise.
+\item Clear global containers between test cases. A \texttt{priority\_queue} is a max-heap by default.
+\item Do not use \texttt{endl} or \texttt{pow()} for integers.
+\end{itemize}
