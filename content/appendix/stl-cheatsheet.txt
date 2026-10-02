@@ -177,7 +177,7 @@ cout << fixed << setprecision(6) << ans;   // doubles
 | n | Allowed complexity |
 |---|---|
 | <= 10 | O(n!) |
-| <= 20 | O(2^n · n) |
+| <= 20 | O(2^n * n) |
 | <= 500 | O(n^3) |
 | <= 5000 | O(n^2) |
 | <= 1e5 to 1e6 | O(n log n) |

@@ -1,11 +1,15 @@
 /**
+ * Author: Pranav Bhatia
+ * Date: 2026-10-02
+ * License: CC0
+ * Source: User-provided
  * Description: Lazy-propagation segment tree for range addition and range-sum queries.
  * The indices are one-based and ranges are inclusive.
  * To adapt it, change pull() (how children combine), app() (how an update changes
  * a node), and how lz is merged. For min/max queries, also change the out-of-range
  * identity in query().
  * Time: O(\log N) per build node, update, or query.
- * Status: tested
+ * Status: not tested
  */
 #pragma once
 
